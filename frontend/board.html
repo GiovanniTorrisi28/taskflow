@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow — Board</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header>
+    <h1><a href="/projects.html">TaskFlow</a> / <span id="project-name">...</span></h1>
+    <div class="actions">
+      <span id="username-label"></span>
+      <a href="#" id="logout-link">Esci</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="error-message" id="error-message"></div>
+
+    <div class="members-panel">
+      <h3>Membri del progetto</h3>
+      <ul id="members-list"></ul>
+      <form class="add-member-form" id="add-member-form">
+        <input type="text" id="member-username" placeholder="Username da invitare" required />
+        <button type="submit">Aggiungi</button>
+      </form>
+    </div>
+
+    <form class="new-task-form" id="new-task-form">
+      <input type="text" id="task-title" placeholder="Titolo nuovo task" required />
+      <select id="task-assignee">
+        <option value="">Nessun assegnatario</option>
+      </select>
+      <button type="submit">Aggiungi task</button>
+    </form>
+
+    <div class="board">
+      <div class="column" data-status="todo">
+        <h3>To Do</h3>
+        <div class="task-container" id="column-todo"></div>
+      </div>
+      <div class="column" data-status="in_progress">
+        <h3>In corso</h3>
+        <div class="task-container" id="column-in_progress"></div>
+      </div>
+      <div class="column" data-status="done">
+        <h3>Fatto</h3>
+        <div class="task-container" id="column-done"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="task-modal-overlay">
+    <div class="modal">
+      <button class="close-modal" id="close-modal">&times;</button>
+      <h2 id="modal-task-title"></h2>
+      <p id="modal-task-description"></p>
+
+      <div class="status-actions" id="status-actions">
+        <button data-status="todo">To Do</button>
+        <button data-status="in_progress">In corso</button>
+        <button data-status="done">Fatto</button>
+      </div>
+
+      <div class="section-title">Assegnatario</div>
+      <select id="modal-assignee">
+        <option value="">Nessun assegnatario</option>
+      </select>
+
+      <div class="section-title">Log attività</div>
+      <div id="activity-list"></div>
+
+      <div class="section-title">Commenti</div>
+      <div id="comment-list"></div>
+      <form class="comment-form" id="comment-form">
+        <input type="text" id="comment-body" placeholder="Scrivi un commento..." required />
+        <button type="submit">Invia</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/board.js"></script>
+</body>
+</html>

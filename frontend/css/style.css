@@ -1,0 +1,307 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f4f5f7;
+  color: #172b4d;
+}
+
+header {
+  background: #1b2a4a;
+  color: white;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+header a {
+  color: #cfd8ff;
+  text-decoration: none;
+}
+
+header .actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.9rem;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  background: #2f5fd6;
+  color: white;
+  font-size: 0.9rem;
+}
+
+button:hover {
+  background: #24479f;
+}
+
+button.secondary {
+  background: transparent;
+  color: #2f5fd6;
+  border: 1px solid #2f5fd6;
+}
+
+input,
+textarea,
+select {
+  padding: 8px 10px;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+}
+
+input,
+textarea {
+  width: 100%;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.auth-card {
+  max-width: 380px;
+  margin: 60px auto;
+  background: white;
+  padding: 32px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(9, 30, 66, 0.15);
+}
+
+.auth-card h2 {
+  margin-top: 0;
+}
+
+.auth-toggle {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.error-message {
+  color: #bf2600;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+  min-height: 1em;
+}
+
+.project-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.project-card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.15);
+  cursor: pointer;
+}
+
+.project-card:hover {
+  box-shadow: 0 2px 8px rgba(9, 30, 66, 0.25);
+}
+
+.project-card h3 {
+  margin: 0 0 6px 0;
+}
+
+.project-card p {
+  margin: 0;
+  color: #5e6c84;
+  font-size: 0.9rem;
+}
+
+.new-project-form {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+  max-width: 400px;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.column {
+  background: #ebecf0;
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 300px;
+}
+
+.column h3 {
+  margin: 0 0 12px 4px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  color: #5e6c84;
+}
+
+.task-card {
+  background: white;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.2);
+  cursor: pointer;
+}
+
+.task-card:hover {
+  box-shadow: 0 2px 6px rgba(9, 30, 66, 0.3);
+}
+
+.task-card .assignee {
+  font-size: 0.75rem;
+  color: #5e6c84;
+  margin-top: 6px;
+}
+
+.members-panel {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.members-panel h3 {
+  margin-top: 0;
+}
+
+.members-panel ul {
+  list-style: none;
+  margin: 0 0 12px 0;
+  padding: 0;
+}
+
+.members-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.members-panel li button {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.add-member-form {
+  display: flex;
+  gap: 8px;
+}
+
+.add-member-form input {
+  margin-bottom: 0;
+}
+
+.new-task-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 28px;
+  margin-bottom: 12px;
+}
+
+.new-task-form input {
+  margin-bottom: 0;
+}
+
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 30, 66, 0.5);
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal {
+  background: white;
+  border-radius: 10px;
+  padding: 24px;
+  width: 90%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal h2 {
+  margin-top: 0;
+}
+
+.status-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.status-actions button.active {
+  background: #172b4d;
+}
+
+#modal-assignee {
+  width: 100%;
+}
+
+.section-title {
+  font-weight: 600;
+  margin: 18px 0 8px;
+  font-size: 0.9rem;
+  color: #5e6c84;
+  text-transform: uppercase;
+}
+
+.activity-item,
+.comment-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.activity-item .meta,
+.comment-item .meta {
+  color: #5e6c84;
+  font-size: 0.75rem;
+}
+
+.comment-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.close-modal {
+  float: right;
+  background: transparent;
+  color: #5e6c84;
+  border: none;
+  font-size: 1.2rem;
+}

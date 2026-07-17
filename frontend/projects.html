@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow — I tuoi progetti</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header>
+    <h1>TaskFlow</h1>
+    <div class="actions">
+      <span id="username-label"></span>
+      <a href="#" id="logout-link">Esci</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <h2>I tuoi progetti</h2>
+    <div class="error-message" id="error-message"></div>
+
+    <div class="project-list" id="project-list"></div>
+
+    <form class="new-project-form" id="new-project-form">
+      <h3 style="margin-top: 0">Nuovo progetto</h3>
+      <input type="text" id="project-name" placeholder="Nome progetto" required />
+      <textarea id="project-description" placeholder="Descrizione (opzionale)" rows="2"></textarea>
+      <button type="submit">Crea progetto</button>
+    </form>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/projects.js"></script>
+</body>
+</html>
