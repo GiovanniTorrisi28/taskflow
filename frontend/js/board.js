@@ -223,7 +223,7 @@ statusActions.addEventListener("click", async (e) => {
 async function loadActivityForTask(task) {
   try {
     const data = await apiFetch(`/activities?project_id=${projectId}`);
-    const relevant = data.activities.filter((a) => a.task_id === String(task.id));
+    const relevant = data.activities.filter((a) => a.task_id === task.id);
     activityList.innerHTML = relevant.length
       ? relevant.map(renderActivityItem).join("")
       : "<p>Nessuna attività registrata.</p>";

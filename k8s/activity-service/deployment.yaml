@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activity-service
+  namespace: taskflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: activity-service }
+  template:
+    metadata:
+      labels: { app: activity-service }
+    spec:
+      containers:
+        - name: activity-service
+          image: taskflow-activity-service:latest
+          imagePullPolicy: Never
+          ports: [{ containerPort: 5000 }]
+          env:
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: taskflow-secrets, key: JWT_SECRET } }
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: taskflow-secrets, key: DATABASE_URL_ACTIVITIES } }
+          livenessProbe:
+            httpGet: { path: /health, port: 5000 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /health, port: 5000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { memory: "128Mi", cpu: "100m" }
+            limits: { memory: "256Mi", cpu: "300m" }

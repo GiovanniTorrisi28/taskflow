@@ -1,0 +1,29 @@
+---
+- name: Copia e importa le immagini Docker in tutti i nodi del cluster
+  hosts: cluster
+  become: true
+
+  vars:
+    images:
+      - taskflow-user-service.tar
+      - taskflow-project-service.tar
+      - taskflow-activity-service.tar
+      - taskflow-frontend.tar
+
+  tasks:
+    - name: Copia ogni immagine sul nodo (via SFTP/SCP)
+      copy:
+        src: "{{ playbook_dir }}/../images/{{ item }}"
+        dest: "/tmp/{{ item }}"
+      loop: "{{ images }}"
+
+    - name: Importa ogni immagine in containerd (ctr) tramite k3s
+      command: "k3s ctr images import /tmp/{{ item }}"
+      loop: "{{ images }}"
+      changed_when: true
+
+    - name: Rimuovi i tar temporanei dopo l'import
+      file:
+        path: "/tmp/{{ item }}"
+        state: absent
+      loop: "{{ images }}"

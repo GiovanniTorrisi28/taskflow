@@ -1,0 +1,34 @@
+---
+# Fissa come statico l'IP DHCP che ogni VM ha già in questo momento (stesso
+# valore in ansible_host e static_ip nell'inventory) — evita che il cluster
+# si rompa se le VM vengono riavviate durante la sessione di lavoro.
+- name: Configura IP statici su tutti i nodi del cluster
+  hosts: cluster
+  become: true
+
+  tasks:
+    - name: Trova l'interfaccia di rete che ha l'IP attuale
+      shell: "ip -4 addr show | grep '{{ ansible_host }}' | awk '{print $NF}'"
+      register: interface_result
+      changed_when: false
+
+    - name: Imposta variabile interfaccia
+      set_fact:
+        bridged_interface: "{{ interface_result.stdout }}"
+
+    - name: Mostra interfaccia trovata (debug)
+      debug:
+        msg: "Interfaccia: {{ bridged_interface }} — IP statico: {{ static_ip }}"
+
+    - name: Scrivi configurazione netplan con IP statico
+      template:
+        src: templates/netplan.j2
+        dest: /etc/netplan/99-static-ip.yaml
+        owner: root
+        group: root
+        mode: '0600'
+      notify: Applica netplan
+
+  handlers:
+    - name: Applica netplan
+      command: netplan apply

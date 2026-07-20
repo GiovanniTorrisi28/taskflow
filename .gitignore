@@ -7,8 +7,12 @@ venv/
 *.egg-info/
 .DS_Store
 
-# Terraform (fasi successive)
+# Terraform
 .terraform/
 *.tfstate
+*.tfstate.*.backup
 *.tfstate.backup
 .terraform.lock.hcl
+
+# Immagini Docker esportate per l'import nei nodi k3s (rigenerabili con docker save)
+infra/local/images/*.tar
