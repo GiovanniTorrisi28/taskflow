@@ -1,0 +1,43 @@
+---
+# RDS non supporta uno script di init montato come il container Postgres locale
+# (docker-entrypoint-initdb.d): i 3 database vanno creati a mano, una volta, via psql
+# dal nodo master (unico che ha un percorso di rete verso la RDS, protetta in subnet
+# privata e raggiungibile solo dal security group del cluster).
+- name: Crea i database applicativi sulla RDS PostgreSQL
+  hosts: master
+  become: true
+
+  vars:
+    databases:
+      - users_db
+      - projects_db
+      - activities_db
+
+  tasks:
+    - name: Installa il client PostgreSQL
+      apt:
+        name: postgresql-client
+        state: present
+        update_cache: true
+
+    - name: Crea ogni database se non esiste già (idempotente)
+      shell: >
+        PGPASSWORD='{{ db_password }}' psql -h {{ rds_address }} -U {{ db_username }} -d taskflow -tc
+        "SELECT 1 FROM pg_database WHERE datname = '{{ item }}'" | grep -q 1 ||
+        PGPASSWORD='{{ db_password }}' psql -h {{ rds_address }} -U {{ db_username }} -d taskflow -c
+        "CREATE DATABASE {{ item }}"
+      args:
+        executable: /bin/bash
+      loop: "{{ databases }}"
+      register: db_create_result
+      changed_when: "'CREATE DATABASE' in db_create_result.stdout"
+
+    - name: Verifica elenco database sulla RDS
+      shell: >
+        PGPASSWORD='{{ db_password }}' psql -h {{ rds_address }} -U {{ db_username }} -d taskflow -c "\l"
+      register: db_list
+      changed_when: false
+
+    - name: Mostra elenco database
+      debug:
+        msg: "{{ db_list.stdout_lines }}"

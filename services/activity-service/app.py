@@ -10,6 +10,10 @@ def create_app():
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # testa ogni connessione presa dal pool con un ping leggero prima di usarla: senza questo,
+    # una connessione lasciata inattiva troppo a lungo (tipico con RDS) fallisce con un errore
+    # SSL sul primo utilizzo invece di essere trasparentemente sostituita
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
     db.init_app(app)
 
     with app.app_context():

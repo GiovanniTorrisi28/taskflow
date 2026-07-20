@@ -92,8 +92,6 @@ terraform apply
 
 Conferma con `yes`. Crea `taskflow-master`, `taskflow-worker1`, `taskflow-worker2` (1 CPU, 2GB RAM, 8GB disco ciascuna) su rete bridged Wi-Fi. Ci vogliono un paio di minuti.
 
-> Se la creazione va in timeout o le VM restano "Running" senza mai diventare raggiungibili, vedi la sezione **Troubleshooting** in fondo prima di insistere.
-
 **2. Recupera gli IP delle VM**
 
 ```powershell
@@ -201,6 +199,137 @@ terraform destroy
 
 Cancella le 3 VM. Verifica con `multipass list` che non resti nulla.
 
+## Deploy su AWS (EC2 + k3s + RDS)
+
+Stessa applicazione, stessi manifest Kubernetes (a parte il database), ma su infrastruttura cloud reale invece che VM locali. **Comporta costi orari reali** — vedi la sezione costi in fondo, e ricordati sempre il cleanup a fine sessione.
+
+### Prerequisiti
+
+- **AWS CLI configurata** (`aws sts get-caller-identity` deve rispondere) con una regione di default (qui si usa `eu-west-1`)
+- **Terraform** installato
+- **Un Key Pair EC2 già creato** su AWS (nome di default nel codice: `aws-learning-key`) e il file `.pem` corrispondente sul disco
+- **WSL2** con Ansible installato (stesso identico requisito della Fase locale)
+- Le immagini Docker devono già esistere su Docker Hub (almeno un push su `main` con `docker.yml` verde) — altrimenti i pod restano in `ImagePullBackOff`
+
+### Architettura del deploy
+
+- **VPC dedicata** (`10.0.0.0/16`, non quella default di AWS): 1 subnet pubblica (le 3 EC2) + 2 subnet private in due Availability Zone diverse (richiesto da RDS anche per una singola istanza)
+- **RDS PostgreSQL** (`db.t3.micro`) in subnet privata, **non pubblicamente accessibile** — il security group accetta connessioni sulla porta 5432 solo dal security group del cluster k3s, non da internet
+- Un solo database RDS con **3 database logici** (`users_db`, `projects_db`, `activities_db`), stesso principio già adottato in locale — non 3 istanze separate, per contenere i costi
+- Cluster k3s a 3 nodi su EC2 (master `t3.small` + 2 worker `t3.micro`), **Traefik** attivo come ingress controller, stessa configurazione della Fase locale
+- Immagini Docker **tirate da Docker Hub** (`imagePullPolicy: Always`) — identico alla Fase locale, nessun import manuale nemmeno qui
+
+### Passaggi
+
+**1. Scegli una password per il database e creala in un file non versionato**
+
+```bash
+cd infra/aws/terraform
+echo 'db_password = "una-password-a-piacere"' > terraform.tfvars
+```
+
+`terraform.tfvars` è già in `.gitignore` — non finisce mai nel repository.
+
+**2. Crea VPC, RDS e le 3 EC2 con Terraform**
+
+```bash
+terraform init
+terraform apply
+```
+
+Conferma con `yes`. La RDS impiega 5-10 minuti a diventare disponibile; le EC2 sono pronte in meno di un minuto. **Meglio lanciarlo direttamente nel terminale**, non tramite un assistente, per evitare timeout.
+
+**3. Annota gli output**
+
+```bash
+terraform output
+```
+
+Servono `master_public_ip`, `master_private_ip`, `worker_public_ips`, `rds_address`.
+
+**4. Verifica/copia la chiave `.pem` in WSL2**
+
+```bash
+cp /mnt/c/Users/<tuo-utente>/.ssh/aws-learning-key.pem ~/.ssh/
+chmod 600 ~/.ssh/aws-learning-key.pem
+```
+
+**5. Aggiorna `infra/aws/ansible/inventory.ini`** con gli IP e l'endpoint RDS ottenuti al passo 3 (`ansible_host`/`k3s_private_ip` per il master, `ansible_host` per i worker, `rds_address`, `db_password` — la stessa scelta al passo 1).
+
+**6. Installa k3s**
+
+```bash
+cd ../ansible
+ansible-playbook -i inventory.ini playbook-k3s.yaml
+```
+
+Stesso comportamento della Fase locale (Traefik incluso) — lanciarlo direttamente nel terminale, richiede qualche minuto.
+
+**7. Crea i database applicativi sulla RDS**
+
+```bash
+ansible-playbook -i inventory.ini playbook-rds-init.yaml
+```
+
+RDS non supporta uno script di init come il container Postgres locale: questo playbook installa `psql` sul master e crea `users_db`/`projects_db`/`activities_db` (idempotente, si può rilanciare senza problemi).
+
+**8. Aggiorna `infra/aws/k8s/secret.yaml`** con l'endpoint RDS reale, la password scelta al passo 1, e un `JWT_SECRET` a piacere (es. generato con `python -c "import secrets; print(secrets.token_urlsafe(32))"`).
+
+**9. Copia i manifest sul master e applicali**
+
+```bash
+ansible master -i inventory.ini -m copy -a "src='<percorso-progetto>/taskflow/infra/aws/k8s/' dest=/home/ubuntu/k8s/"
+ansible master -i inventory.ini -m shell -a 'sudo kubectl apply -f /home/ubuntu/k8s/ --recursive' --become
+```
+
+> Stessa race condition transitoria vista nella Fase locale: se la prima esecuzione dà errori `namespace "taskflow" not found`, rilancia lo stesso comando.
+
+**10. Verifica**
+
+```bash
+ansible master -i inventory.ini -m shell -a 'sudo kubectl get nodes' --become
+ansible master -i inventory.ini -m shell -a 'sudo kubectl get pods -n taskflow' --become
+```
+
+**11. Apri l'app**
+
+`http://<master_public_ip>/`
+
+### Nota tecnica: connessioni RDS "stale"
+
+Una connessione SQLAlchemy lasciata inattiva troppo a lungo (comune con RDS) può fallire al primo utilizzo successivo con `SSL error: decryption failed or bad record mac`. I 3 servizi backend configurano `SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}` per testare ogni connessione prima di usarla e sostituirla trasparentemente se non più valida — se lavori su questi servizi, mantieni questa opzione.
+
+### Aggiornare l'app dopo una modifica al codice
+
+Identico alla Fase locale:
+
+```bash
+git push origin main   # CI/CD pubblica le nuove immagini su Docker Hub
+ansible master -i inventory.ini -m shell -a 'sudo kubectl rollout restart deployment -n taskflow' --become
+```
+
+### Cleanup — obbligatorio a fine sessione
+
+A differenza delle VM Multipass, qui **non conviene "fermare e riprendere"**: le EC2 senza un IP elastico cambiano indirizzo ad ogni riavvio (rompendo l'inventory), e RDS continua comunque a costare mentre esiste. La pratica corretta è distruggere tutto a fine sessione e ricreare da capo la prossima volta:
+
+```bash
+cd infra/aws/terraform
+terraform destroy
+```
+
+Conferma con `yes`. Verifica su console AWS (EC2 e RDS) che non resti nulla.
+
+### Costo stimato
+
+| Risorsa | Tipo | Costo/ora |
+|---|---|---|
+| Master | t3.small | ~$0.023 |
+| Worker × 2 | t3.micro | ~$0.013 × 2 |
+| RDS | db.t3.micro | idoneo al free tier nei primi 12 mesi, altrimenti ~$0.017 |
+| **Totale** | | **~$0.066/ora** senza free tier |
+
+Per una sessione di poche ore: pochi centesimi. Non lasciare le risorse attive inutilmente.
+
 ## Struttura
 
 ```
@@ -215,7 +344,10 @@ taskflow/
 │   ├── local/
 │   │   ├── terraform/    # Provisioning VM Multipass (k3s locale)
 │   │   └── ansible/      # Configurazione IP statici, installazione k3s
-│   └── aws/              # Fase successiva: EC2 + k3s + RDS (non ancora implementata)
+│   └── aws/
+│       ├── terraform/    # VPC, security group, RDS, 3x EC2
+│       ├── ansible/      # Installazione k3s, init database su RDS
+│       └── k8s/          # Manifest Kubernetes per AWS (secret con endpoint RDS, niente postgres/)
 ├── docker-compose.yml
 └── .github/workflows/    # CI/CD: test automatici + build/push immagini su Docker Hub
 ```

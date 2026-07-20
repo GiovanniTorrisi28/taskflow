@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: activity-service
+  namespace: taskflow
+spec:
+  selector:
+    app: activity-service
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP

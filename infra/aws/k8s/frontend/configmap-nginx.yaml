@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-config
+  namespace: taskflow
+data:
+  default.conf: |
+    server {
+        listen 80;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # a differenza di Docker Compose, qui NON serve un resolver dinamico:
+        # le Service di Kubernetes hanno un ClusterIP stabile per tutta la loro vita,
+        # quindi risolvere l'hostname una sola volta (comportamento di default di nginx) va bene.
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+
+        location ~ ^/api/auth/(.*)$ {
+            rewrite ^/api/auth/(.*)$ /$1 break;
+            proxy_pass http://user-service:5000;
+        }
+
+        location ~ ^/api/users/(.*)$ {
+            rewrite ^/api/users/(.*)$ /users/$1 break;
+            proxy_pass http://user-service:5000;
+        }
+
+        location ~ ^/api/projects(.*)$ {
+            rewrite ^/api/projects(.*)$ /projects$1 break;
+            proxy_pass http://project-service:5000;
+        }
+
+        location ~ ^/api/tasks(.*)$ {
+            rewrite ^/api/tasks(.*)$ /tasks$1 break;
+            proxy_pass http://project-service:5000;
+        }
+
+        location ~ ^/api/activities(.*)$ {
+            rewrite ^/api/activities(.*)$ /activities$1 break;
+            proxy_pass http://activity-service:5000;
+        }
+
+        location ~ ^/api/comments(.*)$ {
+            rewrite ^/api/comments(.*)$ /comments$1 break;
+            proxy_pass http://activity-service:5000;
+        }
+    }
