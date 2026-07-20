@@ -37,6 +37,30 @@ pip install -r requirements-dev.txt
 pytest -q
 ```
 
+## CI/CD (GitHub Actions)
+
+Due workflow in `.github/workflows/`:
+
+- **`ci.yml`** — esegue la suite pytest dei 3 servizi (matrix, uno per servizio) ad ogni push o pull request su `main`. Non richiede configurazione: parte così com'è.
+- **`docker.yml`** — solo sui push a `main`: rilancia gli stessi test e, se passano, builda e pusha su Docker Hub le 4 immagini (`taskflow-user-service`, `taskflow-project-service`, `taskflow-activity-service`, `taskflow-frontend`), taggate `latest` e con il commit SHA.
+
+### Setup di `docker.yml` (da fare una sola volta)
+
+**1. Genera un Access Token su Docker Hub**
+- [hub.docker.com](https://hub.docker.com) → **Account Settings → Security → New Access Token**
+- Nome a piacere (es. `taskflow-github-actions`), permessi **Read, Write**
+- Copia il token — si vede solo in questo momento
+
+**2. Aggiungi due secret al repository GitHub**
+- Sul repository → **Settings → Secrets and variables → Actions → New repository secret**
+- `DOCKERHUB_USERNAME` → il tuo username Docker Hub
+- `DOCKERHUB_TOKEN` → il token copiato al passo 1
+
+**3. Push su `main`**
+Da questo momento, ogni push su `main` fa partire entrambi i workflow automaticamente — seguili dal tab **Actions** del repository su GitHub.
+
+Senza questi secret configurati, `ci.yml` funziona comunque normalmente (i test partono lo stesso) — solo il job di build/push di `docker.yml` fallirebbe al login su Docker Hub.
+
 ## Deploy su Kubernetes locale (Multipass + k3s)
 
 Guida completa per far girare l'app su un cluster k3s reale a 3 nodi (1 master + 2 worker), partendo da zero. Pensata per essere seguita da chi non ha mai lanciato questo progetto — utile per rifare il deploy da capo o per chi deve solo valutare/provare il progetto.
