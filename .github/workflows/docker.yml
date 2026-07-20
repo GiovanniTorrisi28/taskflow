@@ -3,6 +3,10 @@ name: Docker Build & Push
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/**'
+      - 'frontend/**'
+      - '.github/workflows/docker.yml'
 
 jobs:
   test:

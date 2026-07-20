@@ -13,8 +13,8 @@ spec:
     spec:
       containers:
         - name: activity-service
-          image: taskflow-activity-service:latest
-          imagePullPolicy: Never
+          image: giovannitorrisi/taskflow-activity-service:latest
+          imagePullPolicy: Always
           ports: [{ containerPort: 5000 }]
           env:
             - name: JWT_SECRET

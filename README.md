@@ -42,7 +42,7 @@ pytest -q
 Due workflow in `.github/workflows/`:
 
 - **`ci.yml`** — esegue la suite pytest dei 3 servizi (matrix, uno per servizio) ad ogni push o pull request su `main`. Non richiede configurazione: parte così com'è.
-- **`docker.yml`** — solo sui push a `main`: rilancia gli stessi test e, se passano, builda e pusha su Docker Hub le 4 immagini (`taskflow-user-service`, `taskflow-project-service`, `taskflow-activity-service`, `taskflow-frontend`), taggate `latest` e con il commit SHA.
+- **`docker.yml`** — solo sui push a `main` **che toccano `services/`, `frontend/` o il workflow stesso** (un push che modifica solo README/documentazione non lo fa partire): rilancia gli stessi test e, se passano, builda e pusha su Docker Hub le 4 immagini (`taskflow-user-service`, `taskflow-project-service`, `taskflow-activity-service`, `taskflow-frontend`), taggate `latest` e con il commit SHA.
 
 ### Setup di `docker.yml` (da fare una sola volta)
 
@@ -69,31 +69,20 @@ Guida completa per far girare l'app su un cluster k3s reale a 3 nodi (1 master +
 
 - **Multipass** installato ([multipass.run](https://multipass.run)) — su Windows usa il backend VirtualBox (Hyper-V spesso non disponibile su Windows Home)
 - **Terraform** installato
-- **Docker Desktop** installato e in esecuzione (serve solo per buildare le immagini, non deve restare acceso durante il resto del deploy)
 - **WSL2** con una distribuzione Linux (es. Ubuntu) con **Ansible** installato — Ansible non gira nativamente su Windows
 - Non serve `kubectl` sul PC Windows: in questa guida i comandi Kubernetes girano direttamente sul nodo master tramite Ansible
+- Non serve Docker Desktop sul PC che fa il deploy: le immagini sono già pubblicate su Docker Hub da GitHub Actions (vedi sezione **CI/CD** sopra) — serve solo che almeno un push su `main` sia già andato a buon fine prima del primo deploy
 
 ### Architettura del deploy
 
 - 3 VM Multipass su rete bridged Wi-Fi (necessaria per farle comunicare tra loro e per raggiungerle da WSL2)
 - k3s con **Traefik** come ingress controller (incluso di default in k3s, non lo disabilitiamo)
-- Le 4 immagini Docker (3 servizi + frontend) vengono buildate in locale e **importate direttamente** nei nodi via SSH — nessun registry esterno necessario in questa fase (il push su un registry è la Fase C, CI/CD)
+- Le 4 immagini Docker (3 servizi + frontend) vengono **tirate da Docker Hub** (`giovannitorrisi/taskflow-*:latest`, `imagePullPolicy: Always`) — pubblicate automaticamente da `docker.yml` ad ogni push su `main`. Il cluster non builda né importa nulla localmente.
 - Nessuna persistenza dati (Postgres perde i dati se il pod viene ricreato) — scelta accettabile per un progetto didattico
 
 ### Passaggi
 
-**1. Build ed esporta le immagini Docker**
-
-```bash
-cd taskflow
-docker compose build
-docker save taskflow-user-service:latest -o infra/local/images/taskflow-user-service.tar
-docker save taskflow-project-service:latest -o infra/local/images/taskflow-project-service.tar
-docker save taskflow-activity-service:latest -o infra/local/images/taskflow-activity-service.tar
-docker save taskflow-frontend:latest -o infra/local/images/taskflow-frontend.tar
-```
-
-**2. Crea le 3 VM con Terraform**
+**1. Crea le 3 VM con Terraform**
 
 ```powershell
 cd infra/local/terraform
@@ -105,7 +94,7 @@ Conferma con `yes`. Crea `taskflow-master`, `taskflow-worker1`, `taskflow-worker
 
 > Se la creazione va in timeout o le VM restano "Running" senza mai diventare raggiungibili, vedi la sezione **Troubleshooting** in fondo prima di insistere.
 
-**3. Recupera gli IP delle VM**
+**2. Recupera gli IP delle VM**
 
 ```powershell
 multipass list
@@ -113,7 +102,7 @@ multipass list
 
 Annota l'IP di ciascuna VM.
 
-**4. Prepara la chiave SSH per Ansible (dentro WSL2)**
+**3. Prepara la chiave SSH per Ansible (dentro WSL2)**
 
 Se non esiste già una chiave dedicata:
 
@@ -132,11 +121,11 @@ multipass exec taskflow-worker2 -- bash -c "mkdir -p ~/.ssh && echo '$pubkey' >>
 
 > Usa sempre `>>` (append), mai `>` (overwrite): le VM hanno già la chiave interna di Multipass in `authorized_keys` — sovrascriverla rompe `multipass exec`.
 
-**5. Aggiorna l'inventory Ansible**
+**4. Aggiorna l'inventory Ansible**
 
-Apri `infra/local/ansible/inventory.ini` e sostituisci gli IP con quelli ottenuti al passo 3 (sia `ansible_host` che `static_ip` per ogni nodo devono avere lo **stesso valore** — è l'IP DHCP attuale che il passo successivo renderà statico). Controlla anche che `gateway` corrisponda al gateway della tua rete (di solito il primo indirizzo della sottorete, es. `192.168.1.1`).
+Apri `infra/local/ansible/inventory.ini` e sostituisci gli IP con quelli ottenuti al passo 2 (sia `ansible_host` che `static_ip` per ogni nodo devono avere lo **stesso valore** — è l'IP DHCP attuale che il passo successivo renderà statico). Controlla anche che `gateway` corrisponda al gateway della tua rete (di solito il primo indirizzo della sottorete, es. `192.168.1.1`).
 
-**6. Configura IP statici** (sopravvivono ai riavvii delle VM)
+**5. Configura IP statici** (sopravvivono ai riavvii delle VM)
 
 Da WSL2:
 
@@ -145,7 +134,7 @@ cd "/mnt/c/Users/<tuo-utente>/Universita/Sistemi cloud/taskflow/infra/local/ansi
 ansible-playbook -i inventory.ini playbook-static-ip.yaml
 ```
 
-**7. Installa k3s**
+**6. Installa k3s**
 
 ```bash
 ansible-playbook -i inventory.ini playbook-k3s.yaml
@@ -153,24 +142,18 @@ ansible-playbook -i inventory.ini playbook-k3s.yaml
 
 Installa k3s server sul master (Traefik incluso) e k3s agent sui worker, poi verifica che tutti i nodi siano `Ready`. Richiede qualche minuto — **meglio lanciarlo direttamente nel terminale** (non tramite un assistente/chat) per evitare timeout.
 
-**8. Importa le immagini Docker nei nodi**
-
-```bash
-ansible-playbook -i inventory.ini playbook-images.yaml
-```
-
-Copia via SSH e importa in containerd le 4 immagini su tutti e 3 i nodi (~250MB a nodo, richiede qualche minuto).
-
-**9. Copia i manifest Kubernetes sul master e applicali**
+**7. Copia i manifest Kubernetes sul master e applicali**
 
 ```bash
 ansible master -i inventory.ini -m copy -a "src='<percorso-progetto>/taskflow/k8s/' dest=/home/ubuntu/k8s/"
 ansible master -i inventory.ini -m shell -a 'sudo kubectl apply -f /home/ubuntu/k8s/ --recursive' --become
 ```
 
+Kubernetes tirerà da solo le 4 immagini da Docker Hub (`imagePullPolicy: Always`) — nessun passaggio di build/import manuale.
+
 > Se la prima esecuzione fallisce con errori tipo `namespace "taskflow" not found` su alcune risorse, è una race condition transitoria (il namespace non è ancora pienamente propagato quando vengono applicate le risorse successive). **Rilancia lo stesso comando** — `kubectl apply` è idempotente, la seconda volta va a buon fine.
 
-**10. Verifica**
+**8. Verifica**
 
 ```bash
 ansible master -i inventory.ini -m shell -a 'sudo kubectl get nodes' --become
@@ -179,9 +162,25 @@ ansible master -i inventory.ini -m shell -a 'sudo kubectl get pods -n taskflow' 
 
 Tutti e 3 i nodi devono essere `Ready`, tutti i pod `Running` e `1/1`. Alcuni riavvii iniziali dei pod applicativi sono normali: partono prima che Postgres sia pronto ad accettare connessioni e Kubernetes li riavvia automaticamente finché non si connettono con successo.
 
-**11. Apri l'app**
+**9. Apri l'app**
 
-Vai su `http://<IP-DEL-MASTER>/` nel browser (l'IP di `taskflow-master` ottenuto al passo 3).
+Vai su `http://<IP-DEL-MASTER>/` nel browser (l'IP di `taskflow-master` ottenuto al passo 2).
+
+### Aggiornare l'app dopo una modifica al codice
+
+Non serve più rifare il deploy da capo:
+
+```bash
+git push origin main   # CI/CD builda e pubblica le nuove immagini su Docker Hub automaticamente
+```
+
+Poi, quando `docker.yml` è verde su GitHub, sul cluster:
+
+```bash
+ansible master -i inventory.ini -m shell -a 'sudo kubectl rollout restart deployment -n taskflow' --become
+```
+
+Questo forza ogni Deployment a ricreare i pod, tirando la versione più recente di `:latest` da Docker Hub grazie a `imagePullPolicy: Always`.
 
 ### Fermare e riprendere il cluster
 
@@ -191,7 +190,7 @@ multipass stop taskflow-master taskflow-worker1 taskflow-worker2
 multipass start taskflow-master taskflow-worker1 taskflow-worker2
 ```
 
-Grazie agli IP statici configurati al passo 6, il cluster riparte con gli stessi indirizzi e k3s si riavvia da solo (è un servizio systemd) — non serve rifare l'installazione.
+Grazie agli IP statici configurati al passo 5, il cluster riparte con gli stessi indirizzi e k3s si riavvia da solo (è un servizio systemd) — non serve rifare l'installazione.
 
 ### Distruggere tutto
 
@@ -211,13 +210,12 @@ taskflow/
 │   ├── project-service/
 │   └── activity-service/
 ├── frontend/
-├── k8s/                  # Manifest Kubernetes (namespace, secret, deployment/service per servizio, ingress)
+├── k8s/                  # Manifest Kubernetes (namespace, secret, deployment/service per servizio, ingress) — immagini da Docker Hub
 ├── infra/
 │   ├── local/
 │   │   ├── terraform/    # Provisioning VM Multipass (k3s locale)
-│   │   ├── ansible/      # Configurazione IP statici, installazione k3s, import immagini
-│   │   └── images/       # Immagini Docker esportate (.tar, non versionate)
+│   │   └── ansible/      # Configurazione IP statici, installazione k3s
 │   └── aws/              # Fase successiva: EC2 + k3s + RDS (non ancora implementata)
 ├── docker-compose.yml
-└── .github/workflows/    # CI/CD (fase successiva, non ancora implementata)
+└── .github/workflows/    # CI/CD: test automatici + build/push immagini su Docker Hub
 ```

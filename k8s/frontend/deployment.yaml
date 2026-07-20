@@ -13,8 +13,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: taskflow-frontend:latest
-          imagePullPolicy: Never
+          image: giovannitorrisi/taskflow-frontend:latest
+          imagePullPolicy: Always
           ports: [{ containerPort: 80 }]
           volumeMounts:
             - name: nginx-config
